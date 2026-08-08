@@ -33,26 +33,26 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Murf AI',
-  pageTitle: 'Voice Agent Starter',
-  pageDescription: 'A voice agent powered by Murf Falcon — the fastest TTS API',
+  companyName: 'Fin Saathi',
+  pageTitle: 'Fin Saathi Financial Guidance Voice Agent',
+  pageDescription: 'Your personal AI financial advisor, ready to help you plan your future.',
 
   supportsChatInput: true,
   supportsVideoInput: true,
   supportsScreenShare: true,
   isPreConnectBufferEnabled: true,
 
-  logo: '/murf-logo.svg',
-  accent: '#6366F1',
-  logoDark: '/murf-logo-dark.svg',
-  accentDark: '#818cf8',
-  startButtonText: 'Start talking',
+  logo: '/avatar.png',
+  accent: '#10b981',
+  logoDark: '/avatar.png',
+  accentDark: '#10b981',
+  startButtonText: 'Speak with Advisor',
 
   // optional: audio visualization configuration
-  // audioVisualizerType: 'bar',
-  // audioVisualizerColor: '#002cf2',
-  // audioVisualizerColorDark: '#1fd5f9',
-  // audioVisualizerColorShift: 0.3,
+  audioVisualizerType: 'aura',
+  audioVisualizerColor: '#10b981',
+  audioVisualizerColorDark: '#0f172a',
+  audioVisualizerColorShift: 0.2,
   // audioVisualizerBarCount: 5,
   // audioVisualizerType: 'radial',
   // audioVisualizerRadialBarCount: 24,
@@ -62,7 +62,6 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   // audioVisualizerGridColumnCount: 25,
   // audioVisualizerType: 'wave',
   // audioVisualizerWaveLineWidth: 3,
-  // audioVisualizerType: 'aura',
 
   // agent dispatch configuration
   agentName: process.env.AGENT_NAME ?? undefined,

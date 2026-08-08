@@ -156,7 +156,7 @@ export interface AgentSessionView_01Props {
 }
 
 export function AgentSessionView_01({
-  preConnectMessage = 'Agent is listening, ask it a question',
+  preConnectMessage = 'Your advisor is ready, ask them a question...',
   supportsChatInput = true,
   supportsVideoInput = true,
   supportsScreenShare = true,
@@ -250,13 +250,33 @@ export function AgentSessionView_01({
                 duration={2}
                 aria-hidden={messages.length > 0}
                 {...SHIMMER_MOTION_PROPS}
-                className="pointer-events-none mx-auto block w-full max-w-2xl pb-4 text-center text-sm font-semibold"
+                className="pointer-events-none mx-auto block w-full max-w-2xl pb-2 text-center text-sm font-semibold"
               >
                 {preConnectMessage}
               </MotionMessage>
             )}
           </AnimatePresence>
         )}
+        
+        {/* Agent State Indicator */}
+        <AnimatePresence>
+          {agentState && agentState !== 'disconnected' && agentState !== 'failed' && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="pointer-events-none mx-auto block w-full max-w-2xl pb-4 text-center text-sm font-bold text-primary tracking-wide uppercase"
+            >
+              {agentState === 'connecting' || agentState === 'initializing'
+                ? 'Connecting to FinSathi...'
+                : agentState === 'listening'
+                ? '🎙️ Listening to you'
+                : agentState === 'thinking' || agentState === 'speaking'
+                ? '🔊 FinSathi is speaking'
+                : ''}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="bg-background relative mx-auto max-w-2xl pb-3 md:pb-12">
           <Fade bottom className="absolute inset-x-0 top-0 h-4 -translate-y-full" />
           <AgentControlBar

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/app/theme-provider';
 import { ThemeToggle } from '@/components/app/theme-toggle';
 import { cn } from '@/lib/shadcn/utils';
 import { getAppConfig, getStyles } from '@/lib/utils';
+import { FintechBackground } from '@/components/app/fintech-background';
 import '@/styles/globals.css';
 
 const publicSans = Public_Sans({
@@ -60,11 +61,12 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       )}
     >
       <head>
-        {styles && <style>{styles}</style>}
+        {styles && <style dangerouslySetInnerHTML={{ __html: styles }} />}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
       </head>
       <body className="overflow-x-hidden">
+        <FintechBackground />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
