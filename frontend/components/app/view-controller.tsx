@@ -38,16 +38,20 @@ export function ViewController({ appConfig }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const { resolvedTheme } = useTheme();
   const [hasEnded, setHasEnded] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorState, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the session was connected and now it is disconnected, the call ended.
-    if (!isConnected && !hasEnded) {
+    if (isConnected) {
+      setHasStarted(true);
+      setHasEnded(false);
+    } else if (hasStarted) {
+      // If we were previously started/connected and now we're not, the call ended
       setHasEnded(true);
       setIsConnecting(false);
     }
-  }, [isConnected]);
+  }, [isConnected, hasStarted]);
 
   const handleStartCall = async () => {
     setIsConnecting(true);

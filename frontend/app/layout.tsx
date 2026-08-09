@@ -61,7 +61,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       )}
     >
       <head>
-        {styles && <style dangerouslySetInnerHTML={{ __html: styles }} />}
+        {styles && <style dangerouslySetInnerHTML={{ __html: styles }} suppressHydrationWarning />}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
       </head>

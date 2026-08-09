@@ -18,6 +18,8 @@ const AGENT_NAME = process.env.AGENT_NAME;
 // don't cache the results
 export const revalidate = 0;
 
+import { cookies } from 'next/headers';
+
 export async function POST(req: Request) {
   try {
     if (LIVEKIT_URL === undefined) {
@@ -36,17 +38,20 @@ export async function POST(req: Request) {
     if (body?.room_config) {
       roomConfig = RoomConfiguration.fromJson(body.room_config, { ignoreUnknownFields: true });
     } else if (AGENT_NAME) {
-      // When AGENT_NAME is set, configure explicit agent dispatch so the named
-      // agent worker picks up the job when a user joins the room.
       roomConfig = RoomConfiguration.fromJson(
         { agents: [{ agentName: AGENT_NAME }] },
         { ignoreUnknownFields: true }
       );
     }
       
-    // Generate participant token
     const participantName = 'user';
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
+    const cookieStore = await cookies();
+    let participantIdentity = cookieStore.get('finsathi_user_id')?.value;
+    
+    if (!participantIdentity) {
+      participantIdentity = `voice_user_${Math.random().toString(36).substring(2, 15)}`;
+    }
+
     const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
 
     const participantToken = await createParticipantToken(
@@ -55,17 +60,25 @@ export async function POST(req: Request) {
       roomConfig
     );
 
-    // Return connection details
     const data: ConnectionDetails = {
       serverUrl: LIVEKIT_URL,
       roomName,
       participantName,
       participantToken,
     };
+    
     const headers = new Headers({
       'Cache-Control': 'no-store',
     });
-    return NextResponse.json(data, { headers });
+    
+    const response = NextResponse.json(data, { headers });
+    // Set cookie for 1 year
+    response.cookies.set('finsathi_user_id', participantIdentity, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365
+    });
+    
+    return response;
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);
