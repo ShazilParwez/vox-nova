@@ -29,6 +29,27 @@ load_dotenv(".env.local")
 # Initialize SQLite database
 db.init_db()
 
+SCHEMES_DATA = {
+    "PMJJBY": {
+        "min_age": 18,
+        "max_age": 50,
+        "premium": "₹436 per year",
+        "coverage": "₹2 lakh for life insurance cover",
+        "source": "Department of Financial Services, Ministry of Finance, Government of India",
+        "source_url": "https://financialservices.gov.in/",
+        "verified_on": "2026-08-10"
+    },
+    "PMSBY": {
+        "min_age": 18,
+        "max_age": 70,
+        "premium": "₹20 per year",
+        "coverage": "₹2 lakh for accidental death / total permanent disability, ₹1 lakh for partial permanent disability",
+        "source": "Department of Financial Services, Ministry of Finance, Government of India",
+        "source_url": "https://financialservices.gov.in/",
+        "verified_on": "2026-08-10"
+    }
+}
+
 class Assistant(Agent):
     def __init__(self, room: rtc.Room) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
@@ -67,6 +88,52 @@ class Assistant(Agent):
 
         db.save_caller_memory(user_id, name, facts, language_preference)
         return "Successfully saved caller memory."
+
+    @function_tool(description="Check a user's eligibility for supported Indian government financial schemes using the current official scheme rules. Use this tool when a user asks whether they may be eligible for a supported scheme and the required eligibility information (age, account status) has been collected. Do not use it to approve enrollment or guarantee benefits. The result is informational only.")
+    async def check_scheme_eligibility(self, scheme: str, age: int, has_eligible_account: bool):
+        scheme_key = scheme.upper().strip()
+        if scheme_key not in SCHEMES_DATA:
+            return json.dumps({
+                "status": "unavailable",
+                "message": f"Eligibility information for {scheme} could not be retrieved or is unsupported."
+            })
+            
+        data = SCHEMES_DATA[scheme_key]
+        
+        if not has_eligible_account:
+            return json.dumps({
+                "scheme": scheme_key,
+                "status": "not_eligible",
+                "reason": ["An eligible individual bank or Post Office account is required for this scheme."],
+                "source": data["source"],
+                "source_url": data["source_url"],
+                "verified_on": data["verified_on"]
+            })
+            
+        if age < data["min_age"] or age > data["max_age"]:
+            return json.dumps({
+                "scheme": scheme_key,
+                "status": "not_eligible",
+                "reason": [f"Age {age} is outside the current eligibility range of {data['min_age']} to {data['max_age']} years."],
+                "source": data["source"],
+                "source_url": data["source_url"],
+                "verified_on": data["verified_on"]
+            })
+            
+        return json.dumps({
+            "scheme": scheme_key,
+            "status": "eligible",
+            "reason": [
+                f"Age is within the {data['min_age']}-{data['max_age']} eligibility range.",
+                "User has confirmed an eligible bank/Post Office account."
+            ],
+            "premium": data["premium"],
+            "coverage": data["coverage"],
+            "source": data["source"],
+            "source_url": data["source_url"],
+            "verified_on": data["verified_on"],
+            "disclaimer": "This is an informational eligibility check and not an approval or enrollment confirmation. Final enrollment is subject to the official process."
+        })
 
 
 server = AgentServer()

@@ -260,6 +260,30 @@ For deeper documentation on each part, see:
 
 ---
 
+## Day 5: VoiceForBharat Challenge - Real Domain Data Tool
+
+For Day 5, we added a real function call (`check_scheme_eligibility`) to check user eligibility for Indian government financial schemes (PMJJBY and PMSBY).
+
+**Tool Purpose**: Checks user eligibility based on current official rules and provides a structured output containing the status, reason, premium, coverage, source metadata, and verification date.
+**Data Source**: Official rules derived from the Department of Financial Services, Ministry of Finance, Government of India (https://financialservices.gov.in/).
+**Data Type**: The eligibility rules are maintained locally as a structured dataset and derived from the official Government of India source. They are not a live API response.
+**Verification Date**: August 10, 2026.
+**Input Schema**: `scheme` (string), `age` (integer), `has_eligible_account` (boolean).
+**Output Schema**: A JSON string with `status` (eligible/not_eligible/insufficient_information/unavailable), `reason`, `premium`, `coverage`, `source`, `source_url`, `verified_on`, and `disclaimer`.
+**Failure Handling**: If an unknown scheme is queried, the tool returns an `unavailable` status. The agent is explicitly instructed NOT to guess or hallucinate any financial data on failure, but to gracefully inform the user that it cannot verify the information right now.
+**Privacy Protections**: The tool ONLY requests non-sensitive information (age and basic account status). The agent is strictly instructed to NEVER ask for or store sensitive credentials (OTP, PIN, passwords, CVV, card numbers, Aadhaar, etc.).
+
+### Example Conversation (PMSBY Eligibility)
+
+**User**: "Hi! Mujhe PMSBY ke liye apni eligibility check karni hai."
+**Agent**: "Sure. Main aapki basic eligibility check kar sakta hoon. Aapki age kya hai?"
+**User**: "Main 34 saal ka hoon."
+**Agent**: "Thanks. Kya aapke paas participating bank ya Post Office ka eligible individual account hai?"
+**User**: "Haan."
+**Agent**: *(Calls check_scheme_eligibility)* "Aapke diye gaye answers ke basis par aap PMSBY ki basic eligibility criteria meet karte hain. Current official information ke mutabik PMSBY 18 se 70 saal ke eligible bank ya Post Office account holders ke liye available hai aur current annual premium ₹20 hai. Ye information Department of Financial Services, Ministry of Finance, Government of India ke official source se verified hai. Final enrollment official process par depend karega."
+
+---
+
 ## Links
 
 - [Murf API Docs](https://murf.ai/api/docs)
