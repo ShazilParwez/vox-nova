@@ -51,8 +51,8 @@ SCHEMES_DATA = {
 }
 
 class Assistant(Agent):
-    def __init__(self, room: rtc.Room) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+    def __init__(self, room: rtc.Room, instructions: str = SYSTEM_PROMPT) -> None:
+        super().__init__(instructions=instructions)
         self.room = room
 
     def get_user_id(self):
@@ -152,12 +152,23 @@ async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+    
+    # Inject outbound call instructions if applicable
+    instructions = SYSTEM_PROMPT
+    if ctx.room.metadata:
+        try:
+            metadata = json.loads(ctx.room.metadata)
+            if metadata.get("call_type") == "financial_scheme_reminder":
+                scheme = metadata.get("scheme", "PMSBY")
+                instructions += f"\n\nOUTBOUND CALL CONTEXT:\nYou are initiating an outbound call. This is a reminder for {scheme}. Follow the OUTBOUND CALL OPENING RULE in your instructions exactly."
+        except Exception as e:
+            logger.warning(f"Failed to parse room metadata: {e}")
 
     # Set up a voice AI pipeline
     session = AgentSession(
         stt=deepgram.STT(model="nova-3", language="multi"),
         llm=google.LLM(
-                model="gemini-3.5-flash",
+                model="gemini-3.5-flash-lite",
             ),
         tts=murf.TTS(
                 voice="Anisha", 
@@ -170,11 +181,20 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
+    logger.info(f"[7] AGENT_JOB_RECEIVED: Job started in room {ctx.room.name}")
+    
+    @session.on("user_speech_started")
+    def on_user_speech_started():
+        logger.info("[11] STT_STARTED: User speech detected")
+
     @session.on("user_input_transcribed")
     def on_user_input_transcribed(event: UserInputTranscribedEvent):
         # We check if the transcription is final
         if hasattr(event, 'is_final') and not event.is_final:
             return
+            
+        logger.info(f"[12] STT_TRANSCRIPT_RECEIVED: '{getattr(event, 'transcript', getattr(event, 'text', ''))}'")
+        logger.info("[13] GEMINI_REQUEST_STARTED: Prompting LLM")
             
         user_id = "unknown_user"
         for p in ctx.room.remote_participants.values():
@@ -186,9 +206,20 @@ async def my_agent(ctx: JobContext):
         elif hasattr(event, 'text') and event.text:
             db.save_query(user_id, event.text)
 
+    @session.on("agent_speech_started")
+    def on_agent_speech_started():
+        logger.info("[15] TTS_STARTED: Agent starting speech output")
+        logger.info("[17] AGENT_AUDIO_PUBLISHED: Agent audio stream beginning")
+
+    @session.on("agent_speech_committed")
+    def on_agent_speech_committed():
+        logger.info("[14] GEMINI_RESPONSE_RECEIVED: LLM generated response")
+        logger.info("[16] TTS_AUDIO_GENERATED: TTS generation complete")
+        logger.info("[18] SIP_AUDIO_OUTPUT_CONFIRMED: Audio published to room")
+
     # Start the session
     await session.start(
-        agent=Assistant(room=ctx.room),
+        agent=Assistant(room=ctx.room, instructions=instructions),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -204,6 +235,48 @@ async def my_agent(ctx: JobContext):
 
     # Join the room and connect to the user
     await ctx.connect()
+    logger.info(f"[8] AGENT_JOINED_ROOM: Connected to {ctx.room.name}")
+    
+    for participant in ctx.room.remote_participants.values():
+        logger.info(f"[6] SIP_PARTICIPANT_CONNECTED: Participant {participant.identity} found in room")
+        logger.info(f"[9] SIP_AUDIO_TRACK_DETECTED: Checking tracks for {participant.identity}")
+        for track in participant.track_publications.values():
+            logger.info(f"[10] AUDIO_FRAMES_RECEIVED: Found published track {track.sid}")
+
+    # If it's an outbound call, we need to trigger the agent to speak first
+    if ctx.room.metadata and "financial_scheme_reminder" in ctx.room.metadata:
+        async def outbound_greeting():
+            import asyncio
+            from livekit.agents import llm
+            # Wait a moment for audio to establish
+            await asyncio.sleep(2)
+            
+            logger.info("Triggering outbound greeting via generate_reply()")
+            logger.info("[13] GEMINI_REQUEST_STARTED: Prompting LLM for greeting")
+            try:
+                # Gemini API throws '400 Bad Request' if the conversation starts with a tool call.
+                # We MUST inject a dummy user message to satisfy Gemini's strict turn-history requirement.
+                if hasattr(session, 'chat_ctx') and hasattr(session.chat_ctx, 'append'):
+                    session.chat_ctx.append(role="user", text="Hello? I just picked up the phone. Please introduce yourself.")
+                elif hasattr(session.history, 'append'):
+                    try:
+                        # If it's a ChatContext
+                        session.history.append(role="user", text="Hello? I just picked up the phone. Please introduce yourself.")
+                    except TypeError:
+                        # If it's a plain list, instantiate ChatMessage with a list for content as required by pydantic
+                        try:
+                            msg = llm.ChatMessage(role="user", content="Hello? I just picked up the phone. Please introduce yourself.")
+                        except Exception:
+                            # In some LiveKit versions, content expects a list of ChatContent or str
+                            msg = llm.ChatMessage(role="user", content=["Hello? I just picked up the phone. Please introduce yourself."])
+                        session.history.append(msg)
+                
+                await session.generate_reply()
+            except Exception as e:
+                logger.error(f"Error triggering outbound greeting: {e}")
+            
+        import asyncio
+        asyncio.create_task(outbound_greeting())
 
 
 if __name__ == "__main__":
