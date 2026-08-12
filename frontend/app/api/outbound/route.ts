@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     // Ensure we trigger the outbound call python script
     const cmd = `uv run python src/outbound_call.py ${safePhone} ${safeScheme}`;
     
-    return new Promise((resolve) => {
+    return new Promise<Response>((resolve) => {
       exec(cmd, { cwd: backendDir }, (error, stdout, stderr) => {
         console.log('Outbound call execution output:', stdout);
         if (error) {

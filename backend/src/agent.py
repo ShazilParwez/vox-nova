@@ -1,6 +1,8 @@
 import logging
 import json
 import db
+import uuid
+import datetime
 
 from prompt import SYSTEM_PROMPT
 from dotenv import load_dotenv
@@ -135,6 +137,50 @@ class Assistant(Agent):
             "disclaimer": "This is an informational eligibility check and not an approval or enrollment confirmation. Final enrollment is subject to the official process."
         })
 
+    @function_tool(description="Create a human support escalation request. Use this ONLY when the user explicitly agrees to escalate their issue (like suspected fraud or an account-specific financial decision). You must ask for permission and tell them what will be shared before calling this. DO NOT include OTP, PIN, passwords, CVV, or complete bank account numbers in the summary.")
+    async def create_escalation(self, who_needs_help: str, issue: str, what_happened: str, what_agent_checked: str, urgency: str, language: str, preferred_follow_up: str):
+        user_id = self.get_user_id()
+        if user_id == "unknown_user":
+            user_id = "anonymous_" + uuid.uuid4().hex[:4]
+
+        # Generate reference ID e.g. ESC-FIN-20260812-AB12
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        ref_id = f"ESC-FIN-{date_str}-{uuid.uuid4().hex[:4].upper()}"
+
+        # Safety check: ensure no sensitive information is accidentally passed in
+        sensitive_keywords = ["otp", "pin", "password", "cvv"]
+        combined_text = f"{issue} {what_happened} {what_agent_checked}".lower()
+        for word in sensitive_keywords:
+            if word in combined_text:
+                return json.dumps({
+                    "status": "error",
+                    "message": f"Escalation failed: sensitive information '{word}' detected. Please retry without sensitive data."
+                })
+
+        success = db.create_escalation_record(
+            reference_id=ref_id,
+            user_id=user_id,
+            who_needs_help=who_needs_help,
+            issue=issue,
+            what_happened=what_happened,
+            what_agent_checked=what_agent_checked,
+            urgency=urgency,
+            language=language,
+            preferred_follow_up=preferred_follow_up
+        )
+
+        if success:
+            return json.dumps({
+                "status": "success",
+                "reference_id": ref_id,
+                "message": "Escalation request successfully created."
+            })
+        else:
+            return json.dumps({
+                "status": "error",
+                "message": "Failed to create escalation request in database."
+            })
+
 
 server = AgentServer()
 
@@ -176,7 +222,7 @@ async def my_agent(ctx: JobContext):
                 tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
                 text_pacing=True
             ),
-        turn_detection=MultilingualModel(),
+
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=True,
     )

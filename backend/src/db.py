@@ -36,6 +36,22 @@ def init_db():
                     FOREIGN KEY(user_id) REFERENCES users(user_id)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS escalations (
+                    reference_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    who_needs_help TEXT,
+                    issue TEXT,
+                    what_happened TEXT,
+                    what_agent_checked TEXT,
+                    urgency TEXT,
+                    language TEXT,
+                    preferred_follow_up TEXT,
+                    status TEXT DEFAULT 'open',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(user_id)
+                )
+            """)
             conn.commit()
     except Exception as e:
         print(f"Failed to initialize database: {e}")
@@ -101,3 +117,27 @@ def save_query(user_id: str, query_text: str):
             conn.commit()
     except Exception as e:
         print(f"Error saving query: {e}")
+
+def create_escalation_record(reference_id: str, user_id: str, who_needs_help: str, issue: str, what_happened: str, what_agent_checked: str, urgency: str, language: str, preferred_follow_up: str):
+    """Saves a new human escalation request."""
+    try:
+        with get_connection() as conn:
+            conn.execute("""
+                INSERT INTO escalations (reference_id, user_id, who_needs_help, issue, what_happened, what_agent_checked, urgency, language, preferred_follow_up)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (reference_id, user_id, who_needs_help, issue, what_happened, what_agent_checked, urgency, language, preferred_follow_up))
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving escalation: {e}")
+        return False
+
+def get_escalations():
+    """Retrieves all escalations."""
+    try:
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            return [dict(row) for row in conn.execute("SELECT * FROM escalations ORDER BY created_at DESC").fetchall()]
+    except Exception as e:
+        print(f"Error retrieving escalations: {e}")
+        return []
