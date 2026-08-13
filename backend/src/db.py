@@ -52,6 +52,19 @@ def init_db():
                     FOREIGN KEY(user_id) REFERENCES users(user_id)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS call_analytics (
+                    call_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    channel TEXT,
+                    outcome TEXT,
+                    success_reason TEXT,
+                    failure_reason TEXT,
+                    started_at TIMESTAMP,
+                    ended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    duration_seconds INTEGER
+                )
+            """)
             conn.commit()
     except Exception as e:
         print(f"Failed to initialize database: {e}")
@@ -141,3 +154,45 @@ def get_escalations():
     except Exception as e:
         print(f"Error retrieving escalations: {e}")
         return []
+
+def save_call_analytics(call_id: str, user_id: str, channel: str, outcome: str, success_reason: str, failure_reason: str, started_at: str, duration_seconds: int):
+    """Saves the final outcome of a call session for analytics."""
+    try:
+        with get_connection() as conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO call_analytics (call_id, user_id, channel, outcome, success_reason, failure_reason, started_at, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (call_id, user_id, channel, outcome, success_reason, failure_reason, started_at, duration_seconds))
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving call analytics: {e}")
+        return False
+
+def get_analytics_summary():
+    """Returns the total, successful, and failed call counts."""
+    try:
+        with get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            total_calls = conn.execute("SELECT COUNT(*) as count FROM call_analytics").fetchone()["count"]
+            successful_calls = conn.execute("SELECT COUNT(*) as count FROM call_analytics WHERE outcome = 'success'").fetchone()["count"]
+            failed_calls = conn.execute("SELECT COUNT(*) as count FROM call_analytics WHERE outcome = 'failed'").fetchone()["count"]
+            
+            # Optional: Fetch last 5 calls for display
+            recent = conn.execute("SELECT call_id, channel, outcome, ended_at FROM call_analytics ORDER BY ended_at DESC LIMIT 5").fetchall()
+            recent_calls = [dict(r) for r in recent]
+            
+            return {
+                "total_calls": total_calls,
+                "successful_calls": successful_calls,
+                "failed_calls": failed_calls,
+                "recent_calls": recent_calls
+            }
+    except Exception as e:
+        print(f"Error retrieving analytics: {e}")
+        return {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+            "recent_calls": []
+        }

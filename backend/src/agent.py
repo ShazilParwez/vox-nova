@@ -53,9 +53,10 @@ SCHEMES_DATA = {
 }
 
 class Assistant(Agent):
-    def __init__(self, room: rtc.Room, instructions: str = SYSTEM_PROMPT) -> None:
+    def __init__(self, room: rtc.Room, call_state: dict, instructions: str = SYSTEM_PROMPT) -> None:
         super().__init__(instructions=instructions)
         self.room = room
+        self.call_state = call_state
 
     def get_user_id(self):
         # Look up the identity of the user connected to the room
@@ -122,6 +123,9 @@ class Assistant(Agent):
                 "verified_on": data["verified_on"]
             })
             
+        self.call_state["success"] = True
+        self.call_state["success_reason"] = f"Completed eligibility check for {scheme_key}"
+
         return json.dumps({
             "scheme": scheme_key,
             "status": "eligible",
@@ -199,6 +203,15 @@ async def my_agent(ctx: JobContext):
         "room": ctx.room.name,
     }
     
+    # Initialize Call Analytics State
+    call_state = {
+        "success": False,
+        "started_at": datetime.datetime.now(),
+        "channel": "browser",
+        "user_id": "unknown_user",
+        "success_reason": ""
+    }
+
     # Inject outbound call instructions if applicable
     instructions = SYSTEM_PROMPT
     if ctx.room.metadata:
@@ -207,8 +220,32 @@ async def my_agent(ctx: JobContext):
             if metadata.get("call_type") == "financial_scheme_reminder":
                 scheme = metadata.get("scheme", "PMSBY")
                 instructions += f"\n\nOUTBOUND CALL CONTEXT:\nYou are initiating an outbound call. This is a reminder for {scheme}. Follow the OUTBOUND CALL OPENING RULE in your instructions exactly."
+                call_state["channel"] = "sip"
         except Exception as e:
             logger.warning(f"Failed to parse room metadata: {e}")
+
+    @ctx.room.on("participant_connected")
+    def on_participant_connected(participant):
+        call_state["user_id"] = participant.identity
+
+    @ctx.room.on("disconnected")
+    def on_room_disconnected():
+        ended_at = datetime.datetime.now()
+        duration = int((ended_at - call_state["started_at"]).total_seconds())
+        outcome = "success" if call_state["success"] else "failed"
+        failure_reason = "" if call_state["success"] else "User disconnected before completing a supported eligibility check or checklist request."
+        
+        logger.info(f"Call {ctx.room.name} disconnected. Outcome: {outcome}. Saving analytics...")
+        db.save_call_analytics(
+            call_id=ctx.room.name,
+            user_id=call_state["user_id"],
+            channel=call_state["channel"],
+            outcome=outcome,
+            success_reason=call_state["success_reason"],
+            failure_reason=failure_reason,
+            started_at=call_state["started_at"].strftime("%Y-%m-%d %H:%M:%S"),
+            duration_seconds=duration
+        )
 
     # Set up a voice AI pipeline
     session = AgentSession(
@@ -251,21 +288,34 @@ async def my_agent(ctx: JobContext):
             db.save_query(user_id, event.transcript)
         elif hasattr(event, 'text') and event.text:
             db.save_query(user_id, event.text)
+            
+        # Mark as successful as soon as we get valid user input
+        call_state["success"] = True
+        if not call_state["success_reason"]:
+            call_state["success_reason"] = "Conversation took place"
 
     @session.on("agent_speech_started")
     def on_agent_speech_started():
+        call_state["success"] = True
+        if not call_state["success_reason"]:
+            call_state["success_reason"] = "Conversation took place"
         logger.info("[15] TTS_STARTED: Agent starting speech output")
         logger.info("[17] AGENT_AUDIO_PUBLISHED: Agent audio stream beginning")
 
     @session.on("agent_speech_committed")
     def on_agent_speech_committed():
+        # Mark call as successful if the agent was able to reply (conversation happened)
+        call_state["success"] = True
+        if not call_state["success_reason"]:
+            call_state["success_reason"] = "Conversation took place"
+            
         logger.info("[14] GEMINI_RESPONSE_RECEIVED: LLM generated response")
         logger.info("[16] TTS_AUDIO_GENERATED: TTS generation complete")
         logger.info("[18] SIP_AUDIO_OUTPUT_CONFIRMED: Audio published to room")
 
     # Start the session
     await session.start(
-        agent=Assistant(room=ctx.room, instructions=instructions),
+        agent=Assistant(room=ctx.room, call_state=call_state, instructions=instructions),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(

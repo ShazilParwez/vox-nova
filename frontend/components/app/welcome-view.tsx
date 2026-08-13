@@ -40,13 +40,12 @@ export const WelcomeView = ({
   const [outboundState, setOutboundState] = useState<'idle' | 'calling' | 'success' | 'failed'>('idle');
 
   const handleOutboundCall = async () => {
-    if (!phoneNumber) return;
     setOutboundState('calling');
     try {
       const res = await fetch('/api/outbound', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phoneNumber, scheme: 'PMSBY' })
+        body: JSON.stringify({ phone_number: 'shazilparwez', scheme: 'PMSBY' })
       });
       const data = await res.json();
       if (data.success) {
@@ -139,28 +138,19 @@ export const WelcomeView = ({
 
         {/* Day 6 Outbound Call Trigger */}
         <div className="mt-12 w-full max-w-sm pt-8 border-t border-white/10 flex flex-col items-center">
-          <p className="text-white/80 text-sm font-medium mb-4 uppercase tracking-wider">Day 6: Outbound Call Reminder</p>
-          <div className="flex w-full items-center gap-2">
-            <input 
-              type="tel" 
-              placeholder="e.g. +91XXXXXXXXXX" 
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="flex h-10 w-full rounded-full border border-white/20 bg-black/20 px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+          <p className="text-white/80 text-sm font-medium mb-4 uppercase tracking-wider">Day 6: Outbound Call (Linphone SIP)</p>
           <Button
             size="sm"
             onClick={handleOutboundCall}
-            disabled={!phoneNumber || outboundState === 'calling'}
-            className="mt-4 w-full rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+            disabled={outboundState === 'calling'}
+            className="mt-2 w-full rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
           >
             <PhoneOutgoing size={18} className="mr-2" />
             {outboundState === 'idle' ? 'Start Financial Reminder Call' : 
              outboundState === 'calling' ? 'Preparing call...' : 
              outboundState === 'success' ? 'Call connected!' : 'Call failed'}
           </Button>
-          <p className="text-xs text-white/50 mt-3 text-center">This will initiate an outbound call to your configured test number via LiveKit SIP trunk.</p>
+          <p className="text-xs text-white/50 mt-3 text-center">This will initiate an outbound call to <b>shazilparwez</b> via LiveKit SIP trunk.</p>
         </div>
 
       </section>
