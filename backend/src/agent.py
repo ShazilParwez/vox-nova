@@ -52,11 +52,58 @@ SCHEMES_DATA = {
     }
 }
 
-class Assistant(Agent):
-    def __init__(self, room: rtc.Room, call_state: dict, instructions: str = SYSTEM_PROMPT) -> None:
+class BaseAssistant(Agent):
+    def __init__(self, room: rtc.Room, call_state: dict, instructions: str) -> None:
         super().__init__(instructions=instructions)
         self.room = room
         self.call_state = call_state
+
+class Assistant(BaseAssistant):
+    def __init__(self, room: rtc.Room, call_state: dict, instructions: str = SYSTEM_PROMPT) -> None:
+        super().__init__(room, call_state, instructions)
+
+    @function_tool(description="Hand off the conversation to SchemeSathi, the Government Scheme Specialist. Use this ONLY when the user asks for detailed eligibility, document requirements, or enrollment guidance for a specific government scheme. You must pass a summary of what the user is asking and their preferred language.")
+    async def handoff_to_scheme_specialist(self, user_request: str, language: str):
+        if not self.session:
+            return "Handoff failed because session is not linked."
+            
+        # Create the new agent with injected context
+        from scheme_specialist_prompt import SCHEME_SPECIALIST_PROMPT
+        injected_prompt = SCHEME_SPECIALIST_PROMPT + f"\n\n[IMPORTANT HANDOFF CONTEXT]: The user was just handed off to you. Their original request was: '{user_request}'. Language preference: {language}. Introduce yourself as SchemeSathi IMMEDIATELY and answer their request."
+        
+        new_agent = SchemeSathi(self.room, self.call_state, injected_prompt)
+        
+        # Swap the agent in the LiveKit session (this cancels the current turn)
+        self.session.update_agent(new_agent)
+        
+        # Manually trigger a new reply since the current turn is cancelled
+        import asyncio
+        import logging
+        async def trigger_reply():
+            # Wait for the agent swap to fully complete by polling the active agent
+            for _ in range(20):
+                if getattr(self.session, "_activity", None) and self.session._activity.agent == new_agent:
+                    break
+                await asyncio.sleep(0.5)
+                
+            # Wait a tiny bit extra to ensure everything is settled
+            await asyncio.sleep(1.5)
+            
+            try:
+                # generate_reply forces the LLM to process the updated system prompt + history
+                res = self.session.generate_reply(user_input="Please introduce yourself and answer my original query now.")
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as e:
+                logging.getLogger("agent").error(f"Error triggering SchemeSathi reply: {e}")
+                
+        asyncio.create_task(trigger_reply())
+        
+        return "Handoff initiated."
+
+class SchemeSathi(BaseAssistant):
+    def __init__(self, room: rtc.Room, call_state: dict, instructions: str) -> None:
+        super().__init__(room, call_state, instructions)
 
     def get_user_id(self):
         # Look up the identity of the user connected to the room
@@ -313,9 +360,12 @@ async def my_agent(ctx: JobContext):
         logger.info("[16] TTS_AUDIO_GENERATED: TTS generation complete")
         logger.info("[18] SIP_AUDIO_OUTPUT_CONFIRMED: Audio published to room")
 
+    # Create the agent
+    assistant = Assistant(room=ctx.room, call_state=call_state, instructions=instructions)
+
     # Start the session
     await session.start(
-        agent=Assistant(room=ctx.room, call_state=call_state, instructions=instructions),
+        agent=assistant,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
