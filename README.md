@@ -1,96 +1,75 @@
-# Voice Agent Starter — Powered by Murf Falcon
+# FinSaathi — VoiceForBharat Edition (Day 1–10 Final)
 
-Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on the market - swap the system prompt to build anything from customer support to language tutors.
+FinSaathi (फिन साथी) is a friendly, warm, and highly knowledgeable digital financial voice assistant dedicated to helping people across India understand banking and financial services in their preferred language (Hindi, English, or Hinglish). 
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming) [![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io) [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+Built as part of the "10 Days of Voice Agents — VoiceForBharat Edition" challenge, FinSaathi bridges the financial literacy gap by providing an accessible, voice-first interface to understand complex financial products, government schemes, and digital banking safety.
 
----
+## Features & Capabilities
 
-## Why Murf Falcon
-
-- **55ms model latency** - fastest production TTS
-- **130ms time-to-first-audio** across 10+ global regions
-- **$0.01/1000 characters** - up to 10x cheaper than alternatives
-- **150+ voices** across 35+ languages
-- **99.38% pronunciation accuracy**
-
----
+- **Multilingual Support**: Seamlessly converses in Hindi, English, and Hinglish.
+- **Persistent User Memory**: Remembers returning users and their financial facts (with explicit consent).
+- **Domain-Specific Tools**: Checks basic eligibility for government schemes like PMJJBY and PMSBY using official criteria.
+- **Outbound SIP Calling**: Can initiate outbound phone calls (via SIP trunking) to remind users about scheme eligibility or financial follow-ups.
+- **Human Escalation**: Can securely escalate complex or fraudulent issues to human agents with user consent.
+- **Call Analytics**: Logs session outcomes, durations, and channels for analytics reporting.
+- **Specialist Handoff**: Intelligently transfers complex government scheme inquiries to **SchemeSathi**, a dedicated specialist agent, seamlessly passing the conversation context.
+- **Financial Safety Guardrails**: Strictly adheres to safety protocols. It will **never** request OTP, PIN, password, CVV, or full account/card numbers, and it will **never** guarantee financial outcomes or loan approvals.
+- **Real-Time Voice Architecture**: Powered by LiveKit, Deepgram STT, Gemini LLM, and Murf Falcon TTS for ultra-low latency voice interactions.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     A[🎙️ User speaks] -->|audio| B[Deepgram STT]
-    B -->|text| C[LLM]
-    C -->|response text| D[Murf Falcon TTS]
-    D -->|audio| E[LiveKit]
-    E -->|stream| F[🔊 User hears]
-
-    style A fill:#444441,stroke:#888780,color:#fff
-    style B fill:#185FA5,stroke:#85B7EB,color:#fff
-    style C fill:#534AB7,stroke:#AFA9EC,color:#fff
-    style D fill:#0F6E56,stroke:#5DCAA5,color:#fff
-    style E fill:#D85A30,stroke:#F0997B,color:#fff
-    style F fill:#444441,stroke:#888780,color:#fff
+    B -->|text| C[Gemini LLM]
+    C <-->|Function Calls| D[(SQLite DB & Tools)]
+    C -->|Handoff| G[SchemeSathi Specialist]
+    C -->|response text| E[Murf Falcon TTS]
+    G -->|response text| E
+    E -->|audio| F[LiveKit]
+    F -->|stream| H[🔊 User hears / SIP Caller]
 ```
 
----
-
-## Quickstart
+## Setup & Environment Variables
 
 ### Prerequisites
 
 - **Python** 3.10+
 - **[uv](https://docs.astral.sh/uv/)** - fast Python package manager
-  ```bash
-  # macOS/Linux
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  # Windows (PowerShell)
-  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-  ```
 - **Node.js** 18+
 - **pnpm** — fast Node package manager
-  ```bash
-  npm install -g pnpm
-  ```
-- A [LiveKit](https://cloud.livekit.io/) project (free tier available)
+- A LiveKit project
 
-### Step 1: Clone the repo
+### Environment Variables
 
-```bash
-git clone https://github.com/murf-ai/murf-livekit-starter.git
-cd murf-livekit-starter
-```
+Create `.env.local` in both `backend/` and `frontend/` (copy from `.env.example`). You need:
 
-### Step 2: Set up environment variables
+| Variable | Where to get it | Required |
+| -------- | --------------- | -------- |
+| `LIVEKIT_URL` | LiveKit Cloud dashboard | Yes |
+| `LIVEKIT_API_KEY` | LiveKit Cloud dashboard | Yes |
+| `LIVEKIT_API_SECRET` | LiveKit Cloud dashboard | Yes |
+| `LIVEKIT_SIP_TRUNK_ID` | LiveKit SIP config (For Outbound Calling) | Yes |
+| `MURF_API_KEY` | murf.ai/api/dashboard | Yes |
+| `DEEPGRAM_API_KEY` | deepgram.com | Yes |
+| `GOOGLE_API_KEY` | Google AI Studio | Yes |
 
-Create `.env.local` in both `backend/` and `frontend/` (copy from `.env.example` in each). You need:
+### Installation
 
-| Variable                               | Where to get it                                        | Required |
-| -------------------------------------- | ------------------------------------------------------ | -------- |
-| `LIVEKIT_URL`                          | LiveKit Cloud dashboard                                | Yes      |
-| `LIVEKIT_API_KEY`                      | LiveKit Cloud dashboard                                | Yes      |
-| `LIVEKIT_API_SECRET`                   | LiveKit Cloud dashboard                                | Yes      |
-| `MURF_API_KEY`                         | [murf.ai/api/dashboard](https://murf.ai/api/dashboard) | Yes      |
-| `DEEPGRAM_API_KEY`                     | [deepgram.com](https://deepgram.com)                   | Yes      |
-| `GOOGLE_API_KEY` (or `OPENAI_API_KEY`) | Depends on LLM choice                                  | Yes      |
+1. **Install backend dependencies:**
+   ```bash
+   cd backend
+   uv sync
+   uv run python src/agent.py download-files
+   ```
 
-### Step 3: Install backend dependencies
+2. **Install frontend dependencies:**
+   ```bash
+   cd frontend
+   pnpm install
+   ```
 
-```bash
-cd backend
-uv sync
-uv run python src/agent.py download-files
-```
-
-### Step 4: Install frontend dependencies
-
-```bash
-cd frontend
-pnpm install
-```
-
-### Step 5: Run it
+## Running the Application
 
 **Option A - All-in-one (from repo root):**
 
@@ -118,185 +97,49 @@ cd frontend && pnpm dev
 
 Then open **http://localhost:3000** in your browser.
 
-You should now see the voice agent UI. Click **Start talking**, allow microphone access, and speak — the agent will respond with Murf Falcon TTS. Ensure your backend and (if using Option B) LiveKit server are running.
+## Day 1–10 Feature Progression
 
----
+- **Day 1-3 (Foundation)**: Initialized the Voice AI agent using LiveKit, Murf Falcon TTS, Deepgram STT, and Gemini. Established the FinSaathi persona, Hindi/Hinglish capability, and strict financial safety guardrails.
+- **Day 4 (Memory)**: Added a persistent SQLite database (`memory.db`) and tools to save and lookup user information across sessions with explicit consent.
+- **Day 5 (Tools)**: Implemented `check_scheme_eligibility` tool using real domain rules for schemes like PMJJBY and PMSBY.
+- **Day 6 (Outbound SIP)**: Added `outbound_call.py` to initiate SIP calls via LiveKit for financial scheme reminders with specialized outbound prompt injection.
+- **Day 7 (Escalation)**: Created a `create_escalation` tool to handle suspected fraud or complex inquiries by escalating to human support with user consent.
+- **Day 8 (Analytics)**: Added session-level analytics logging to `caller_data.db` to track call durations, success outcomes, and channels.
+- **Day 9 (Specialist Handoff)**: Created the `SchemeSathi` specialist agent and a `handoff_to_scheme_specialist` tool. FinSaathi can smoothly transition complex scheme questions to the specialist while preserving the conversation context.
+- **Day 10 (Final Polish)**: Testing, verification, and documentation updates.
 
-## Deploy
+## Testing & Verification
 
-Want to deploy this beyond localhost? You'll need to deploy **two services**: the backend agent and the frontend. Both must use the same LiveKit project.
+The project includes unit tests for the LLM behavior and Escalation Database.
 
-> This is a two-service app — the backend agent and the frontend UI deploy separately. You'll need both running and connected to the same LiveKit project.
-
-### Backend (Python agent) — Deploy to Railway
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/tIVCF1?referralCode=cNjn2P&utm_medium=integration&utm_source=template&utm_campaign=generic)
-
-Set these environment variables in Railway:
-
-- `MURF_API_KEY`
-- `DEEPGRAM_API_KEY`
-- `GOOGLE_API_KEY` or `OPENAI_API_KEY`
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-
-The backend runs as a long-lived Python process that connects to LiveKit as an agent. Railway handles this well.
-
-### Frontend (Next.js) — Deploy to Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/murf-ai/murf-livekit-starter&root-directory=frontend&env=LIVEKIT_URL,LIVEKIT_API_KEY,LIVEKIT_API_SECRET&project-name=murf-voice-agent&repository-name=murf-voice-agent)
-
-Set these environment variables in Vercel:
-
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-- `AGENT_NAME` (optional — for explicit agent dispatch)
-
-The frontend is a standard Next.js app. Point it at the same LiveKit instance your backend agent is connected to.
-
-### Connecting them
-
-The frontend and backend don't call each other directly — they both connect to **LiveKit**, which handles the real-time audio transport.
-
-1. Use the **same** `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` on both Railway and Vercel
-2. Set `AGENT_NAME=my-agent` on Vercel — this matches the `agent_name="my-agent"` registered in `backend/src/agent.py`
-3. Verify: Railway logs should show the agent connected to LiveKit. Open your Vercel URL, click **Start talking** — the agent should respond
-
-If the agent doesn't connect, double-check that both services point to the same LiveKit project and that the backend is running (check Railway logs).
-
----
-
-## Change the Use Case
-
-The default system prompt makes this a **customer support agent**. You can change the agent’s behavior by editing the prompt.
-
-**Where the prompt lives:** `backend/src/agent.py`- the `SYSTEM_PROMPT` constant (near the top of the file, after the imports). Change that string to change what your voice agent does.
-
-### Example prompts (copy-paste)
-
-**Customer Support (default):**
-
-```
-You are a friendly and efficient customer support agent for a tech company. Help users with account issues, billing questions, and product troubleshooting. Be concise, empathetic, and solution-oriented. If you don't know something, say so honestly and offer to escalate.
+Run backend tests:
+```bash
+cd backend
+uv run pytest
 ```
 
-**Language Tutor:**
-
-```
-You are a patient and encouraging language tutor helping the user practice conversational Spanish. Speak primarily in Spanish but switch to English to explain grammar or vocabulary when needed. Correct mistakes gently and suggest better phrasing. Keep conversations natural and fun.
-```
-
-**AI Receptionist:**
-
-```
-You are a professional receptionist for a medical clinic. Help callers schedule appointments, answer questions about office hours and services, and take messages for doctors. Be warm but efficient. Ask for the caller's name and reason for calling upfront.
-```
-
-See the Configuration section below for voice, STT, and LLM options.
-
----
-
-## Configuration
-
-### Murf voice
-
-Edit the `tts=murf.TTS(...)` call in `backend/src/agent.py`. Set the `voice` argument to any Murf voice ID. Examples:
-
-- `Anisha` — Indian English (female, default in this starter)
-- `Pooja` — Indian English (female)
-- `Samar` — Indian English (male)
-- `Amara` — US English (female)
-- `Gordon` — US English (male)
-- `Hazel` — UK English (female)
-- `Bertie` — UK English (male)
-
-Browse all voices: [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library).
-
-### STT provider
-
-STT is configured in `backend/src/agent.py` in the `AgentSession(stt=...)` call. The default is Deepgram (`deepgram.STT(model="nova-3")`). You can swap to another LiveKit-compatible STT plugin if needed.
-
-### LLM (Gemini vs OpenAI)
-
-- **Gemini (default):** Set `GOOGLE_API_KEY` and use `llm=google.LLM(model="gemini-3.5-flash-lite")` in `agent.py`.
-- **OpenAI:** Set `OPENAI_API_KEY`, add the OpenAI plugin, and use the corresponding `llm=openai.LLM(...)` in `agent.py`.
-
-### Audio format
-
-Murf Falcon and LiveKit handle audio format internally. For advanced options, see [Murf API docs](https://murf.ai/api/docs) and [LiveKit docs](https://docs.livekit.io).
-
----
+Included tests:
+- `test_llm.py`: Verifies FinSaathi strictly refuses to ask for sensitive information (OTP, PIN) and answers general financial questions correctly.
+- `test_escalation_db.py`: Verifies the human escalation logic and SQLite database writes safely without storing sensitive data.
 
 ## Project Structure
 
 ```
 murf-livekit-starter/
-├── backend/                 # Python voice agent (LiveKit Agents + Murf Falcon)
+├── backend/                 # Python voice agent
 │   ├── src/
-│   │   └── agent.py         # Agent entrypoint, pipeline (STT/LLM/TTS), system prompt
-│   ├── tests/               # Agent tests
-│   ├── .env.example         # Backend env template
-│   ├── pyproject.toml       # Python deps (uv)
-│   └── railway.toml         # Railway deploy config
+│   │   ├── agent.py         # Main LiveKit agent entrypoint, pipelines, tools, analytics, handoffs
+│   │   ├── prompt.py        # FinSaathi System Prompt & Guardrails
+│   │   ├── scheme_specialist_prompt.py # SchemeSathi Specialist Prompt
+│   │   ├── db.py            # SQLite implementations (Memory, Analytics, Escalation)
+│   │   └── outbound_call.py # Outbound SIP calling script
+│   ├── tests/               # Pytest test suite
+│   └── ...
 ├── frontend/                # Next.js UI for voice sessions
-│   ├── app/
-│   │   ├── page.tsx         # Main page
-│   │   └── api/token/       # LiveKit token endpoint (dev)
-│   ├── components/          # UI (agents-ui, app config, theme)
-│   ├── app-config.ts        # Branding, title, button text, accent
-│   ├── .env.example         # Frontend env template
-│   └── package.json         # Node deps (pnpm)
+│   ├── app/                 # Next.js App Router (Main UI, Analytics Dashboard)
+│   ├── components/          # UI Components
+│   └── ...
 ├── start_app.sh             # Start LiveKit + backend + frontend (macOS/Linux)
 ├── start_app.ps1            # Start LiveKit + backend + frontend (Windows)
-├── README.md                # This file
+└── README.md                # This file
 ```
-
-For deeper documentation on each part, see:
-
-- [Backend Documentation](./backend/README.md) — agent pipeline, voice/LLM/STT configuration, testing, deployment
-- [Frontend Documentation](./frontend/README.md) — UI customization, visualizers, theming, component architecture
-
----
-
-## Day 5: VoiceForBharat Challenge - Real Domain Data Tool
-
-For Day 5, we added a real function call (`check_scheme_eligibility`) to check user eligibility for Indian government financial schemes (PMJJBY and PMSBY).
-
-**Tool Purpose**: Checks user eligibility based on current official rules and provides a structured output containing the status, reason, premium, coverage, source metadata, and verification date.
-**Data Source**: Official rules derived from the Department of Financial Services, Ministry of Finance, Government of India (https://financialservices.gov.in/).
-**Data Type**: The eligibility rules are maintained locally as a structured dataset and derived from the official Government of India source. They are not a live API response.
-**Verification Date**: August 10, 2026.
-**Input Schema**: `scheme` (string), `age` (integer), `has_eligible_account` (boolean).
-**Output Schema**: A JSON string with `status` (eligible/not_eligible/insufficient_information/unavailable), `reason`, `premium`, `coverage`, `source`, `source_url`, `verified_on`, and `disclaimer`.
-**Failure Handling**: If an unknown scheme is queried, the tool returns an `unavailable` status. The agent is explicitly instructed NOT to guess or hallucinate any financial data on failure, but to gracefully inform the user that it cannot verify the information right now.
-**Privacy Protections**: The tool ONLY requests non-sensitive information (age and basic account status). The agent is strictly instructed to NEVER ask for or store sensitive credentials (OTP, PIN, passwords, CVV, card numbers, Aadhaar, etc.).
-
-### Example Conversation (PMSBY Eligibility)
-
-**User**: "Hi! Mujhe PMSBY ke liye apni eligibility check karni hai."
-**Agent**: "Sure. Main aapki basic eligibility check kar sakta hoon. Aapki age kya hai?"
-**User**: "Main 34 saal ka hoon."
-**Agent**: "Thanks. Kya aapke paas participating bank ya Post Office ka eligible individual account hai?"
-**User**: "Haan."
-**Agent**: *(Calls check_scheme_eligibility)* "Aapke diye gaye answers ke basis par aap PMSBY ki basic eligibility criteria meet karte hain. Current official information ke mutabik PMSBY 18 se 70 saal ke eligible bank ya Post Office account holders ke liye available hai aur current annual premium ₹20 hai. Ye information Department of Financial Services, Ministry of Finance, Government of India ke official source se verified hai. Final enrollment official process par depend karega."
-
----
-
-## Links
-
-- [Murf API Docs](https://murf.ai/api/docs)
-- [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library)
-- [LiveKit Docs](https://docs.livekit.io)
-- [Deepgram Docs](https://developers.deepgram.com)
-- [Murf Falcon Benchmarks](https://murf.ai/falcon/benchmarks)
-- [TTS Latency Benchmarker](https://github.com/sahilsgupta/tts-latency-benchmarker) — run your own p50/p95 tests across providers
-- [Murf Discord](https://discord.gg/FbKAy96Sz7)
-- [Murf Startup Incubator](https://murf.ai/api) — 50M free characters for startups
-
----
-
-## License
-
-MIT
